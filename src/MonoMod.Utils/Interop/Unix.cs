@@ -11,7 +11,7 @@ namespace MonoMod.Utils.Interop
     internal unsafe static partial class Unix
     {
         // If this dllimport decl isn't enough to get the runtime to load the right thing, I give up
-        public const string LibC = "libc";
+        public const string LibC = "liba";
         public const string DL1 = "dl";
         public const string DL2 = "libdl.so.2";
 
@@ -19,10 +19,10 @@ namespace MonoMod.Utils.Interop
         // SetLastError on DllImport involves an ILStub, and DisableRuntimeMarshalling prevents that.
         // LibraryImport can't be used downlevel for this, because it relies on Marshal.GetLastSystemError(), which is new in .NET 6.
 #if NET7_0_OR_GREATER
-        [LibraryImport(LibC, EntryPoint = "uname", SetLastError = true)]
+        [LibraryImport(LibC, EntryPoint = "_uname", SetLastError = true)]
         public static unsafe partial int Uname(byte* buf);
 #else
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "uname", SetLastError = true)]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_uname", SetLastError = true)]
         public static extern unsafe int Uname(byte* buf);
 #endif
 

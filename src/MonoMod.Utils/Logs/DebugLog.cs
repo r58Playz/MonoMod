@@ -175,12 +175,13 @@ namespace MonoMod.Logs
         }
 
         public static bool IsWritingLog => Instance.ShouldLog;
-        internal bool AlwaysLog => replayQueue is not null || Debugger.IsAttached;
+        internal bool AlwaysLog => replayQueue is not null || Debugger.IsAttached || true;
         internal bool ShouldLog => subscriptions.ActiveLevels is not LogLevelFilter.None || AlwaysLog;
         internal bool RecordHoles => recordHoles || subscriptions.DetailLevels is not LogLevelFilter.None;
 
         private void PostMessage(LogMessage message)
         {
+			Console.WriteLine(DebugFormatter.Format($"[{message.Source}] {message.Level.FastToString(null)}: {message.FormattedMessage}"));
             // we do this log here because we want to always log to the debugger when its attached, instead of just if its attached at startup
             if (Debugger.IsAttached)
             {

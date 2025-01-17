@@ -70,6 +70,7 @@ namespace MonoMod.Core.Platforms
                 ArchitectureKind.x86_64 => new Architectures.x86_64Arch(system),
                 ArchitectureKind.Arm => throw new NotImplementedException(),
                 ArchitectureKind.Arm64 => throw new NotImplementedException(),
+                ArchitectureKind.Wasm32 => new Architectures.x86_64Arch(system),
                 var kind => throw new PlatformNotSupportedException($"Architecture kind {kind} not supported"),
             };
         }
@@ -93,6 +94,7 @@ namespace MonoMod.Core.Platforms
                 OSKind.IOS => throw new NotImplementedException(),
                 OSKind.BSD => throw new NotImplementedException(),
                 OSKind.Windows or OSKind.Wine => new Systems.WindowsSystem(),
+                OSKind.Emscripten => new Systems.EmscriptenSystem(),
                 var kind => throw new PlatformNotSupportedException($"OS kind {kind} not supported"),
             };
 
@@ -628,6 +630,7 @@ namespace MonoMod.Core.Platforms
         {
             Helpers.ThrowIfArgumentNull(from);
             Helpers.ThrowIfArgumentNull(to);
+            return to;
 
             // TODO: check that `from` and `to` are actually argument- and return-compatible.
             // When we use this method internally, all the necessary checks are already performed

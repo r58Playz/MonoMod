@@ -79,14 +79,14 @@ namespace MonoMod.Core
     }
 
     /// <summary>
-    /// Provides access to a default, <see cref="PlatformTriple"/>-based <see cref="IDetourFactory"/>, as well as extension methods to make
+    /// Provides access to a default, LibA-based <see cref="IDetourFactory"/>, as well as extension methods to make
     /// using <see cref="IDetourFactory"/> easier.
     /// </summary>
     [CLSCompliant(true)]
     public static class DetourFactory
     {
         // use the actual type for this so that an inlined getter can see the actual type
-        private static PlatformTripleDetourFactory? lazyCurrent;
+        private static IDetourFactory? lazyCurrent;
         /// <summary>
         /// Gets the current (default) <see cref="IDetourFactory"/>. This is always the <see cref="PlatformTriple"/>-based <see cref="IDetourFactory"/>.
         /// </summary>
@@ -101,8 +101,8 @@ namespace MonoMod.Core
             get => Helpers.GetOrInit(ref lazyCurrent, createDefaultFactoryFunc);
         }
 
-        private static readonly Func<PlatformTripleDetourFactory> createDefaultFactoryFunc = CreateDefaultFactory;
-        private static PlatformTripleDetourFactory CreateDefaultFactory()
+        private static readonly Func<IDetourFactory> createDefaultFactoryFunc = CreateDefaultFactory;
+        private static WasmDetourFactory CreateDefaultFactory()
             => new(PlatformTriple.Current);
 
         /// <summary>
