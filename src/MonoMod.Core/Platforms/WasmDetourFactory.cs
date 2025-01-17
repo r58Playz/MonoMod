@@ -2,6 +2,8 @@ using MonoMod.Utils;
 using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace MonoMod.Core.Platforms
 {
@@ -43,7 +45,7 @@ namespace MonoMod.Core.Platforms
             throw new NotSupportedException("Native detours are not supported on WASM.");
         }
 
-        public static class LibA
+        private static class LibA
         {
             [DllImport("liba")]
             public static extern IntPtr magictranslate(IntPtr ptr);
@@ -98,28 +100,44 @@ namespace MonoMod.Core.Platforms
                 }
             }
 
+            private byte[] BuildDetourBytes() {
+                List<byte> il = new();
+
+                IntPtr target = triple.Runtime.GetMethodHandle(Target).GetFunctionPointer();
+                int argCount = Source.GetParameters().Length;
+                if (!Source.IsStatic)
+                    argCount++; // this parameter
+
+                foreach (var i in Enumerable.Range(0, argCount)) {
+                    if (i < 256) {
+                        il.Add(0x0E); // ldarg.s
+                        il.Add((byte)i); // argument idx
+                    } else {
+                        il.AddRange([0xFE, 0x09]); // ldarg
+                        il.AddRange(BitConverter.GetBytes((UInt16)i)); // argument idx
+                    }
+                }
+
+                il.Add(0x20); // ldc.i4 (push int32 onto stack)
+                il.AddRange(BitConverter.GetBytes((Int32)target)); // pointer to target
+                //il.Add(0xD3); // conv.i (convert to native int)
+                il.Add(0x29); // calli
+                il.AddRange([0x02, 0x00, 0x00, 0x00]); // index within method wrapper data to sig
+                il.Add(0x00); // nop
+                il.Add(0x2A); // ret
+
+                return il.ToArray();
+            }
+
             public void Apply()
             {
-                MMDbgLog.Trace($"Applying managed detour from {Source} to {Target}");
+                MMDbgLog.Trace($"Applying managed IL detour from {Source} to {Target}");
 
                 IntPtr source = triple.Runtime.GetMethodHandle(Source).GetFunctionPointer();
                 IntPtr codeptr = LibA.magictranslate(source);
                 UInt32 codelen = LibA.magictranslatelen(source);
 
-                IntPtr target = triple.Runtime.GetMethodHandle(Target).GetFunctionPointer();
-                Int32 targetPtr = triple.Runtime.GetMethodHandle(Target).GetFunctionPointer().ToInt32();
-                byte[] jump = {
-                    0x20, // ldc.i4
-                    (byte)(targetPtr & 0xFF),
-                    (byte)((targetPtr & 0xFF00) >> 8),
-                    (byte)((targetPtr & 0xFF0000) >> 16),
-                    (byte)((targetPtr & 0xFF000000) >> 24), // fnptr
-                    0xD3, // convert to native int?
-                    0x29, 0x02, 0x00, 0x00, 0x00,
-                    0x00,
-                    0x2A,
-                };
-
+                byte[] jump = BuildDetourBytes();
                 if (jump.Length > codelen) throw new Exception($"Jump patch was too big for code! (jump len {jump.Length} while code len {codelen})");
 
                 OldCode = ReadCode(codeptr, codelen);
