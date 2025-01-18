@@ -10,7 +10,7 @@ namespace MonoMod.Core.Platforms
     /// <summary>
     /// An <see cref="IDetourFactory"/> implementation based on LibA.
     /// </summary>
-    internal sealed class WasmDetourFactory : IDetourFactory
+    public sealed class WasmDetourFactory : IDetourFactory
     {
         private readonly PlatformTriple triple;
 
@@ -24,6 +24,7 @@ namespace MonoMod.Core.Platforms
             this.triple = triple;
         }
 
+        /// <inheritdoc/>
         public ICoreDetour CreateDetour(CreateDetourRequest request)
         {
             Helpers.ThrowIfArgumentNull(request.Source);
@@ -40,6 +41,7 @@ namespace MonoMod.Core.Platforms
             return detour;
         }
 
+        /// <inheritdoc/>
         public ICoreNativeDetour CreateNativeDetour(CreateNativeDetourRequest request)
         {
             throw new NotSupportedException("Native detours are not supported on WASM.");
@@ -51,8 +53,6 @@ namespace MonoMod.Core.Platforms
             public static extern IntPtr magictranslate(IntPtr ptr);
             [DllImport("liba")]
             public static extern void magicinvalidate(IntPtr ptr);
-            [DllImport("liba")]
-            public static extern void magicwrap(IntPtr ptr);
             [DllImport("liba")]
             public static extern UInt32 magictranslatelen(IntPtr ptr);
         }
@@ -100,19 +100,23 @@ namespace MonoMod.Core.Platforms
                 }
             }
 
-            private byte[] BuildDetourBytes() {
+            private byte[] BuildDetourBytes(IntPtr source, IntPtr target)
+            {
                 List<byte> il = new();
 
-                IntPtr target = triple.Runtime.GetMethodHandle(Target).GetFunctionPointer();
                 int argCount = Source.GetParameters().Length;
                 if (!Source.IsStatic)
                     argCount++; // this parameter
 
-                foreach (var i in Enumerable.Range(0, argCount)) {
-                    if (i < 256) {
+                foreach (var i in Enumerable.Range(0, argCount))
+                {
+                    if (i < 256)
+                    {
                         il.Add(0x0E); // ldarg.s
                         il.Add((byte)i); // argument idx
-                    } else {
+                    }
+                    else
+                    {
                         il.AddRange([0xFE, 0x09]); // ldarg
                         il.AddRange(BitConverter.GetBytes((UInt16)i)); // argument idx
                     }
@@ -122,7 +126,7 @@ namespace MonoMod.Core.Platforms
                 il.AddRange(BitConverter.GetBytes((Int32)target)); // pointer to target
                 //il.Add(0xD3); // conv.i (convert to native int)
                 il.Add(0x29); // calli
-                il.AddRange([0x02, 0x00, 0x00, 0x00]); // index within method wrapper data to sig
+                il.AddRange([0xF0, 0xF0, 0xF0, 0xF0]); // magic number that gets specialcased by patched runtime
                 il.Add(0x00); // nop
                 il.Add(0x2A); // ret
 
@@ -131,24 +135,31 @@ namespace MonoMod.Core.Platforms
 
             public void Apply()
             {
-                MMDbgLog.Trace($"Applying managed IL detour from {Source} to {Target}");
-
                 IntPtr source = triple.Runtime.GetMethodHandle(Source).GetFunctionPointer();
+                IntPtr target = triple.Runtime.GetMethodHandle(Target).GetFunctionPointer();
+                MMDbgLog.Trace($"Applying managed IL detour from {Source} ({source:X}) to {Target} ({target:X})");
+
                 IntPtr codeptr = LibA.magictranslate(source);
                 UInt32 codelen = LibA.magictranslatelen(source);
 
-                byte[] jump = BuildDetourBytes();
+                MMDbgLog.Trace($"Got Code ptr: {codeptr:X} {codelen}");
+
+                byte[] jump = BuildDetourBytes(source, target);
                 if (jump.Length > codelen) throw new Exception($"Jump patch was too big for code! (jump len {jump.Length} while code len {codelen})");
 
                 OldCode = ReadCode(codeptr, codelen);
                 WriteZeros(codeptr, codelen);
                 WriteCode(codeptr, jump);
 
+                MMDbgLog.Trace($"Wrote to code ptr: {codeptr:X} {codelen}");
+
                 triple.PinMethodIfNeeded(Source);
                 triple.PinMethodIfNeeded(Target);
 
-                LibA.magicwrap(source);
+                MMDbgLog.Trace($"Pinned {source:X} and {target:X}");
+
                 LibA.magicinvalidate(source);
+                MMDbgLog.Trace($"Invalidated {source:X}");
             }
 
             public void Undo()
