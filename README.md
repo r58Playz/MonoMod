@@ -22,7 +22,7 @@ General purpose .NET assembly modding "basework", powered by [cecil](https://git
 ----
 
 ## WASM
-A `liba.c` NativeFileReference needs to be added, this will soon be built in CI and copied into this repo
+Add a NativeFileReference to `liba.o` and use the patched runtime at [my FNA-WASM-Build fork](https://github.com/r58Playz/FNA-WASM-Build)
 
 ## Introduction
 MonoMod is a modding "basework" (base tools + framework).  
