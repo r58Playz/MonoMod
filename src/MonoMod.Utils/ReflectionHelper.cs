@@ -223,6 +223,10 @@ namespace MonoMod.Utils
             }
 
             var (asmName, moduleName) = GetScope(mref);
+            if (asmName is not null && asmName.StartsWith("mscorlib", StringComparison.Ordinal))
+            {
+                asmName = typeof(object).Assembly.GetName().Name;
+            }
             string ToCacheKeyPart(string? asmName, string? moduleName)
                 => $" | {asmName ?? "NOASSEMBLY"}, {moduleName ?? "NOMODULE"}";
             IEnumerable<MemberReference> GetGenericArgumentsRecursive(MemberReference mref)
