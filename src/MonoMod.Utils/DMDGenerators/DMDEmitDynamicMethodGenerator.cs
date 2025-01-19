@@ -73,7 +73,7 @@ namespace MonoMod.Utils
                 name,
                 typeof(void), argTypes,
                 orig?.DeclaringType ?? typeof(DynamicMethodDefinition),
-                false // If any random errors pop up, try setting this to false first.
+                true // If any random errors pop up, try setting this to false first.
             );
 
             // DynamicMethods don't officially "support" certain return types, such as ByRef types.
