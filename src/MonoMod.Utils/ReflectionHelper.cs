@@ -210,7 +210,11 @@ namespace MonoMod.Utils
                     break;
             }
 
+			if (asmName != null && asmName.StartsWith("mscorlib")) asmName = typeof(object).Assembly.GetName().Name;
+
             cacheKey = $"{cacheKey} | {asmName ?? "NOASSEMBLY"}, {moduleName ?? "NOMODULE"}";
+
+			MMDbgLog.Trace($"cacheKey {cacheKey}");
 
             lock (ResolveReflectionCache)
             {
