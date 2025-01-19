@@ -214,8 +214,6 @@ namespace MonoMod.Utils
 
             cacheKey = $"{cacheKey} | {asmName ?? "NOASSEMBLY"}, {moduleName ?? "NOMODULE"}";
 
-			MMDbgLog.Trace($"cacheKey {cacheKey}");
-
             lock (ResolveReflectionCache)
             {
                 if (ResolveReflectionCache.TryGetValue(cacheKey, out var cachedRef) &&
