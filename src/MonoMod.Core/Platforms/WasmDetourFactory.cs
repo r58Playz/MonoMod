@@ -78,7 +78,7 @@ namespace MonoMod.Core.Platforms
                 IsApplied = false;
             }
 
-            private byte[] ReadCode(IntPtr ptr, UInt32 len)
+            private static byte[] ReadCode(IntPtr ptr, UInt32 len)
             {
                 byte[] code = new byte[len];
                 for (int i = 0; i < len; i++)
@@ -87,12 +87,12 @@ namespace MonoMod.Core.Platforms
                 }
                 return code;
             }
-            private void WriteCode(IntPtr ptr, byte[] code)
+            private static void WriteCode(IntPtr ptr, byte[] code)
             {
                 Marshal.Copy(code, 0, ptr, code.Length);
             }
 
-            private void WriteZeros(IntPtr ptr, UInt32 len)
+            private static void WriteZeros(IntPtr ptr, UInt32 len)
             {
                 for (int i = 0; i < len; i++)
                 {
