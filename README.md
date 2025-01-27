@@ -5,15 +5,6 @@ General purpose .NET assembly modding "basework", powered by [cecil](https://git
 *<sup>MIT-licensed.</sup>*
 <!-- #links -->
 
-[![Build and Test](https://github.com/MonoMod/MonoMod/actions/workflows/ci.yml/badge.svg)](https://github.com/MonoMod/MonoMod/actions/workflows/ci.yml)
-
-| GitHub: All | NuGet: Patcher | NuGet: Utils | NuGet: RuntimeDetour | NuGet: HookGen |
-|--|--|--|--|--|
-| [![GitHub releases](https://img.shields.io/github/downloads/MonoMod/MonoMod/total.svg?style=flat-square)](https://github.com/MonoMod/MonoMod/releases) | [![Core](https://img.shields.io/nuget/dt/MonoMod.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod/) | [![Utils](https://img.shields.io/nuget/dt/MonoMod.Utils.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod.Utils/) | [![RuntimeDetour](https://img.shields.io/nuget/dt/MonoMod.RuntimeDetour.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod.RuntimeDetour/) | [![HookGen](https://img.shields.io/nuget/dt/MonoMod.RuntimeDetour.HookGen.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod.RuntimeDetour.HookGen/) |
-| [![Version](https://img.shields.io/github/release/MonoMod/MonoMod.svg?style=flat-square)](https://github.com/MonoMod/MonoMod/releases) | [![Version](https://img.shields.io/nuget/v/MonoMod.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod/) | [![Version](https://img.shields.io/nuget/v/MonoMod.Utils.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod.Utils/) | [![Version](https://img.shields.io/nuget/v/MonoMod.RuntimeDetour.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod.RuntimeDetour/) | [![Version](https://img.shields.io/nuget/v/MonoMod.RuntimeDetour.HookGen.svg?style=flat-square)](https://www.nuget.org/packages/MonoMod.RuntimeDetour.HookGen/) |
-
-<sup>[... or download fresh build artifacts for the last commit.](https://dev.azure.com/MonoMod/MonoMod/_build/latest?definitionId=1)</sup>
-
 ## Sections
 - [WASM](#wasm)
 - [Introduction](#introduction)
@@ -22,7 +13,10 @@ General purpose .NET assembly modding "basework", powered by [cecil](https://git
 ----
 
 ## WASM
-Add a NativeFileReference to `liba.o` from [my FNA-WASM-Build fork](https://github.com/r58Playz/FNA-WASM-Build) and use the patched runtime from there.
+Usage instructions:
+- Add a NativeFileReference to `liba.o` from [my FNA-WASM-Build fork](https://github.com/r58Playz/FNA-WASM-Build) and use the patched threaded runtime from there.
+- Import MonoMod from this repo
+- Use MonoMod normally!
 
 ## Introduction
 MonoMod is a modding "basework" (base tools + framework).  
