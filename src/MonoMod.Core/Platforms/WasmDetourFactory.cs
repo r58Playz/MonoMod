@@ -127,7 +127,6 @@ namespace MonoMod.Core.Platforms
                 //il.Add(0xD3); // conv.i (convert to native int)
                 il.Add(0x29); // calli
                 il.AddRange([0xF0, 0xF0, 0xF0, 0xF0]); // magic number that gets specialcased by patched runtime
-                il.Add(0x00); // nop
                 il.Add(0x2A); // ret
 
                 return il.ToArray();
