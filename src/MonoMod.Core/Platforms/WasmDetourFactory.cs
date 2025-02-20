@@ -110,7 +110,11 @@ namespace MonoMod.Core.Platforms
 
                 foreach (var i in Enumerable.Range(0, argCount))
                 {
-                    if (i < 256)
+                    if (i < 4)
+                    {
+						il.Add((byte)(0x02 + i));
+					}
+                    else if (i < 256)
                     {
                         il.Add(0x0E); // ldarg.s
                         il.Add((byte)i); // argument idx
