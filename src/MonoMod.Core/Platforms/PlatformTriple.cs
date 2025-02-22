@@ -631,6 +631,8 @@ namespace MonoMod.Core.Platforms
             Helpers.ThrowIfArgumentNull(from);
             Helpers.ThrowIfArgumentNull(to);
 
+            return to;
+
             // TODO: check that `from` and `to` are actually argument- and return-compatible.
             // When we use this method internally, all the necessary checks are already performed
             // elsewhere, so we do not need to repeat them here. However, this method is part of
