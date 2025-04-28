@@ -200,7 +200,7 @@ namespace MonoMod.Core.Platforms
 
             public void Apply()
             {
-                if (Strategy != null) throw new Exception("Trying to Apply() a Detour that was applied");
+                if (Strategy != null) return;
 
                 IntPtr source = triple.Runtime.GetMethodHandle(Source).GetFunctionPointer();
                 IntPtr target = triple.Runtime.GetMethodHandle(Target).GetFunctionPointer();
@@ -220,7 +220,7 @@ namespace MonoMod.Core.Platforms
 
             public void Undo()
             {
-                if (Strategy == null) throw new Exception("Trying to Undo() a Detour that was not applied");
+                if (Strategy == null) return;
 
                 IntPtr source = triple.Runtime.GetMethodHandle(Source).GetFunctionPointer();
                 MMDbgLog.Trace($"[WasmDetour] Reverting managed IL detour on {Source} ({source:X}) ");
