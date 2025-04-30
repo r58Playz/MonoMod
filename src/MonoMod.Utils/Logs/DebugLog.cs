@@ -175,7 +175,7 @@ namespace MonoMod.Logs
         }
 
         public static bool IsWritingLog => Instance.ShouldLog;
-        internal bool AlwaysLog => replayQueue is not null || Debugger.IsAttached || true;
+        internal bool AlwaysLog => replayQueue is not null || Debugger.IsAttached;
         internal bool ShouldLog => subscriptions.ActiveLevels is not LogLevelFilter.None || AlwaysLog;
         internal bool RecordHoles => recordHoles || subscriptions.DetailLevels is not LogLevelFilter.None;
 

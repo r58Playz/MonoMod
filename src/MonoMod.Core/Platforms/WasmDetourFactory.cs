@@ -24,6 +24,8 @@ namespace MonoMod.Core.Platforms
             [DllImport("liba")]
             public static extern void magicdetour2(IntPtr ptr, IntPtr code);
             [DllImport("liba")]
+            public static extern int magicdetour2allowed(IntPtr ptr);
+            [DllImport("liba")]
             public static extern void magicundetour2(IntPtr ptr);
         }
 
@@ -61,6 +63,8 @@ namespace MonoMod.Core.Platforms
 
             public void ChangeMethodCode(IntPtr method, byte[] bytes)
             {
+                if (LibA.magicdetour2allowed(method) == 0) throw new NotSupportedException("magicdetour2NOTallowed!!!");
+
 				MMDbgLog.Trace($"[HotReloadDetour] Detouring");
 				WriteFunc(method, CreateFunc(bytes));
             }
@@ -187,13 +191,13 @@ namespace MonoMod.Core.Platforms
             }
 
 			private void TryStrategies(IntPtr fn, byte[] jump) {
-				Strategy = new MagicOverwriteDetourStrategy();
+				Strategy = new HotReloadDetourStrategy();
 				try {
-					MMDbgLog.Trace($"[WasmDetour] Trying MagicOverwriteDetourStrategy");
+					MMDbgLog.Trace($"[WasmDetour] Trying HotReloadDetourStrategy");
 					Strategy.ChangeMethodCode(fn, jump);
 				} catch (Exception e) {
-					MMDbgLog.Trace($"[WasmDetour] Falling back to HotReloadDetourStrategy: {e.Message}");
-					Strategy = new HotReloadDetourStrategy();
+					MMDbgLog.Trace($"[WasmDetour] Falling back to MagicOverwriteDetourStrategy: {e.Message}");
+					Strategy = new MagicOverwriteDetourStrategy();
 					Strategy.ChangeMethodCode(fn, jump);
 				}
 			}

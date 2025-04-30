@@ -460,7 +460,7 @@ namespace MonoMod.RuntimeDetour
                         PrepareEndOfChain(ilhook.Factory);
                         UpdateEndOfChain();
                     }
-                    catch
+                    catch (Exception e)
                     {
                         // the add failed, remove the node and re-update end of chain
                         switch (Interlocked.Exchange(ref ilhook.ManagerData, null))
@@ -474,6 +474,7 @@ namespace MonoMod.RuntimeDetour
                             default:
                                 throw new NotSupportedException("bad managerdata?");
                         }
+                        MMDbgLog.Error($"End of chain add failed !!!! {e}");
                         UpdateEndOfChain();
                         throw;
                     }
