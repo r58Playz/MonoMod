@@ -295,8 +295,14 @@ namespace MonoMod.RuntimeDetour
 
                 // Wait for other threads to have returned from the function
                 var spin = new SpinWait();
+                var x = false;
                 while (Volatile.Read(ref ActiveCalls) > threadCallDepth)
                 {
+                    if (!x) {
+                        Console.WriteLine($"STACK {new StackTrace()}");
+                        Console.WriteLine($"PROXY {SyncProxy?.Name}");
+                        x = true;
+                    }
                     spin.SpinOnce();
                 }
             }
@@ -309,7 +315,7 @@ namespace MonoMod.RuntimeDetour
                 // Determine active call depth of the current thread
                 var stackFrames = new StackTrace().GetFrames();
                 var syncProxyIdentif = PlatformTriple.Current.GetIdentifiable(SyncProxy);
-                return stackFrames.Count(f => f.GetMethod() is { } m && PlatformTriple.Current.GetIdentifiable(m) == syncProxyIdentif);
+                return stackFrames.Count(f => f.GetMethod() is { } m && (PlatformTriple.Current.GetIdentifiable(m) == syncProxyIdentif || m.Name == SyncProxy.Name));
             }
         }
 
