@@ -14,7 +14,7 @@ General purpose .NET assembly modding "basework", powered by [cecil](https://git
 
 ## WASM
 Usage instructions:
-- Add a NativeFileReference to `liba.o` from [my FNA-WASM-Build fork](https://github.com/r58Playz/FNA-WASM-Build) and use the patched threaded runtime from there.
+- Add a NativeFileReference to `liba.o` and `hot_reload_detour.o` from [my FNA-WASM-Build fork](https://github.com/r58Playz/FNA-WASM-Build) and use the patched threaded runtime from there.
 - Import MonoMod from this repo
 - Use MonoMod normally!
 
