@@ -12,6 +12,8 @@ namespace MonoMod.Core.Platforms
     /// </summary>
     public sealed class WasmDetourFactory : IDetourFactory
     {
+        public static bool EnableTailCallDetours = false;
+
         private static class LibA
         {
             [DllImport("liba")]
@@ -37,33 +39,50 @@ namespace MonoMod.Core.Platforms
 
         internal sealed class HotReloadDetourStrategy : IWasmDetourStrategy
         {
-            GCHandle? Method;
+            GCHandle? Code;
 
             private void WriteFunc(IntPtr method, byte[] func)
             {
-                Method = GCHandle.Alloc(func, GCHandleType.Pinned);
+                Code = GCHandle.Alloc(func, GCHandleType.Pinned);
 
-                LibA.magicdetour2(method, Method.Value.AddrOfPinnedObject());
-                LibA.magicinvalidate(method);
+                LibA.magicdetour2(method, Code.Value.AddrOfPinnedObject());
             }
 
             private byte[] CreateFunc(byte[] code)
             {
+                // https://github.com/dotnet/runtime/blob/main/src/mono/mono/metadata/metadata.c#L4373-L4395
                 List<byte> func = new();
 				if (code.Length < 0b00111111) {
-					// tiny
-					byte header = (byte) (0x2 | (code.Length << 2));
+					byte header = (byte) (0x2 | (code.Length << 2)); // 0x2: tiny header
 					func.Add(header);
 					func.AddRange(code);
 					return func.ToArray();
 				} else {
-					throw new NotImplementedException("TODO generate fat headers");
+					// currently hardcoding the stack size and locals which will probably cause mono to freak out
+					MMDbgLog.Trace("[HotReloadDetour] Fat header needed, may fail");
+
+					byte flags1 = (byte) (0x3); // 0x3: fat header
+					byte flags2 = (byte) (0);
+
+					UInt16 max_stack = (UInt16) (32);
+					UInt32 code_size = (UInt32) (code.Length);
+					UInt32 locals = (UInt32) (32);
+
+					func.Add(flags1);
+					func.Add(flags2);
+					func.AddRange(BitConverter.GetBytes(max_stack));
+					func.AddRange(BitConverter.GetBytes(code_size));
+					func.AddRange(BitConverter.GetBytes(locals));
+					func.AddRange(code);
+
+					return func.ToArray();
 				}
             }
 
             public void ChangeMethodCode(IntPtr method, byte[] bytes)
             {
-                if (LibA.magicdetour2allowed(method) == 0) throw new NotSupportedException("magicdetour2NOTallowed!!!");
+                if (LibA.magicdetour2allowed(method) == 0)
+					throw new NotSupportedException("HotReloadDetour is known to not work for this function type (magicdetour2NOTallowed!!)");
 
 				MMDbgLog.Trace($"[HotReloadDetour] Detouring");
 				WriteFunc(method, CreateFunc(bytes));
@@ -71,13 +90,13 @@ namespace MonoMod.Core.Platforms
 
             public void RevertMethodCode(IntPtr method)
             {
-                if (!Method.HasValue) throw new Exception("Trying to Undo() a Detour that was not applied");
+                if (!Code.HasValue) throw new Exception("Trying to Undo() a Detour that was not applied");
 
 				MMDbgLog.Trace($"[HotReloadDetour] Undetouring");
                 LibA.magicundetour2(method);
 
-                Method.Value.Free();
-				Method = null;
+                Code.Value.Free();
+				Code = null;
             }
         }
 
@@ -115,10 +134,7 @@ namespace MonoMod.Core.Platforms
 
                 if (bytes.Length > codelen) throw new Exception($"Jump patch was too big for code! (jump len {bytes.Length} while code len {codelen})");
 
-                MMDbgLog.Trace($"[MagicOverwriteDetour] Got Code ptr: {codeptr:X} {codelen}");
-
                 byte[] oldCode = OverwriteCode(codeptr, codelen, bytes);
-
                 MMDbgLog.Trace($"[MagicOverwriteDetour] Wrote to code ptr: {codeptr:X} {codelen}");
 
                 OldCode = oldCode;
@@ -154,7 +170,7 @@ namespace MonoMod.Core.Platforms
                 IsApplied = false;
             }
 
-            private byte[] BuildDetourBytes(IntPtr source, IntPtr target)
+            private byte[] BuildDetourBytes(IntPtr source, IntPtr target, bool disableTailCalls = false)
             {
                 List<byte> il = new();
 
@@ -166,26 +182,31 @@ namespace MonoMod.Core.Platforms
                 {
                     if (i < 4)
                     {
-                        il.Add((byte)(0x02 + i));
+                        il.Add((byte)(0x02 + i)); // ldarg.{0,1,2,3}
                     }
                     else if (i < 256)
                     {
                         il.Add(0x0E); // ldarg.s
-                        il.Add((byte)i); // argument idx
+                        il.Add((byte)i);
                     }
                     else
                     {
                         il.AddRange([0xFE, 0x09]); // ldarg
-                        il.AddRange(BitConverter.GetBytes((UInt16)i)); // argument idx
+                        il.AddRange(BitConverter.GetBytes((UInt16)i));
                     }
                 }
 
-                il.Add(0x20); // ldc.i4 (push int32 onto stack)
-                il.AddRange(BitConverter.GetBytes((Int32)target)); // pointer to target
-                //il.Add(0xD3); // conv.i (convert to native int)
-                il.Add(0x29); // calli
-                il.AddRange([0xF0, 0xF0, 0xF0, 0xF0]); // magic number that gets specialcased by patched runtime
-                il.Add(0x2A); // ret
+                il.Add(0x20); // ldc.i4
+                il.AddRange(BitConverter.GetBytes((Int32)target));
+
+				// strictly worse for size but possibly faster?
+                if (!disableTailCalls && WasmDetourFactory.EnableTailCallDetours) {
+                    il.AddRange([0xFE, 0x14]); // tail.
+				}
+
+				il.Add(0x29); // calli
+				il.AddRange([0xF0, 0xF0, 0xF0, 0xF0]); // magic number that gets specialcased by patched runtime
+				il.Add(0x2A); // ret
 
                 return il.ToArray();
             }
@@ -210,8 +231,16 @@ namespace MonoMod.Core.Platforms
                 IntPtr target = triple.Runtime.GetMethodHandle(Target).GetFunctionPointer();
                 MMDbgLog.Trace($"[WasmDetour] Applying managed IL detour from {Source} ({source:X}) to {Target} ({target:X})");
 
-                byte[] jump = BuildDetourBytes(source, target);
-				TryStrategies(source, jump);
+				try {
+					TryStrategies(source, BuildDetourBytes(source, target));
+				} catch(Exception e) {
+					if (WasmDetourFactory.EnableTailCallDetours) {
+						MMDbgLog.Trace($"[WasmDetour] tail call detour failed, trying without tail calls: {e.Message}");
+						TryStrategies(source, BuildDetourBytes(source, target, true));
+					} else {
+						throw;
+					}
+				}
 
                 triple.PinMethodIfNeeded(Source);
                 triple.PinMethodIfNeeded(Target);

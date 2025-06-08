@@ -208,6 +208,8 @@ namespace MonoMod.Utils
             => Generate(null);
         public MethodInfo Generate(object? context)
         {
+            // Switches.TryGetSwitchValue(Switches.DMDType, out var swValue) ? swValue as string : null;
+            // dm is the only one that actually works everywhere on wasm
             var dmdType = "dm";
 
             if (dmdType is not null)
