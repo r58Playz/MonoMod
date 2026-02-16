@@ -1,4 +1,4 @@
-﻿using Mono.Cecil;
+using Mono.Cecil;
 using Mono.Cecil.Cil;
 using MonoMod.Utils.Cil;
 using System;
@@ -105,6 +105,7 @@ namespace MonoMod.Utils
             var paramOffs = def.HasThis ? 1 : 0;
             var emitArgs = new object?[2];
             var checkTryEndEarly = false;
+            var skipInstrEmit = false;
             foreach (var instr in def.Body.Instructions)
             {
                 if (labelMap.TryGetValue(instr, out var label))
@@ -160,7 +161,9 @@ namespace MonoMod.Utils
 
                     }
 
-                    // Avoid duplicate endfilter / endfinally
+                    // Avoid duplicate endfilter / endfinally when another handler starts next.
+                    // ILGenerator.BeginFinallyBlock/BeginCatchBlock/BeginExceptFilterBlock call
+                    // InternalEndClause() which emits an implicit endfinally/endfilter.
                     if (handler.HandlerStart == instr.Next)
                     {
                         switch (handler.HandlerType)
@@ -175,8 +178,91 @@ namespace MonoMod.Utils
                                 break;
                         }
                     }
+
+                    // Avoid duplicate leave when a handler starts next.
+                    // ILGenerator.BeginFinallyBlock/BeginCatchBlock/BeginFaultBlock call
+                    // InternalEndClause() which emits an implicit "leave end" when the
+                    // last clause type is CATCH/FILTER (i.e., first handler in try block,
+                    // or after a catch/filter handler). If the source IL has an explicit
+                    // leave right before the handler start, we get two consecutive leave
+                    // instructions. The second (implicit) one is dead code, but the v10
+                    // Mono interpreter's BB_STATE system mishandles this pattern, causing
+                    // infinite loops. Skip the explicit leave only when the implicit one
+                    // targets the same destination (the end of the last handler in this
+                    // exception block = HandlerEnd of the last handler sharing TryStart).
+                    if (handler.HandlerStart == instr.Next
+                        && (instr.OpCode == Mono.Cecil.Cil.OpCodes.Leave || instr.OpCode == Mono.Cecil.Cil.OpCodes.Leave_S))
+                    {
+                        // Determine what InternalEndClause would emit. It emits "leave end"
+                        // when LastClauseType() returns CATCH or FILTER. For the first handler
+                        // in a try block (no prior handlers), LastClauseType() returns CATCH.
+                        // After a FINALLY/FAULT handler, it emits endfinally instead (already
+                        // handled above). So we check: would InternalEndClause emit a leave?
+                        bool wouldEmitLeave;
+                        // Find the previous handler in the same exception block (same TryStart)
+                        var prevHandler = def.Body.ExceptionHandlers
+                            .Where(h => h.TryStart == handler.TryStart && h != handler
+                                     && h.HandlerStart?.Offset < handler.HandlerStart?.Offset)
+                            .OrderByDescending(h => h.HandlerStart?.Offset)
+                            .FirstOrDefault();
+                        if (prevHandler == null)
+                        {
+                            // First handler in try block: LastClauseType() returns CATCH → emits leave
+                            wouldEmitLeave = true;
+                        }
+                        else
+                        {
+                            // After a handler: depends on its type
+                            wouldEmitLeave = prevHandler.HandlerType == ExceptionHandlerType.Catch
+                                          || prevHandler.HandlerType == ExceptionHandlerType.Filter;
+                        }
+
+                        if (wouldEmitLeave)
+                        {
+                            // The implicit "leave end" targets the end label, which gets marked
+                            // at EndExceptionBlock at HandlerEnd of the last handler in this block.
+                            var lastHandler = def.Body.ExceptionHandlers
+                                .Where(h => h.TryStart == handler.TryStart)
+                                .OrderByDescending(h => h.HandlerStart?.Offset)
+                                .First();
+                            var endTarget = lastHandler.HandlerEnd;
+                            var explicitTarget = (Instruction)instr.Operand;
+
+                            if (explicitTarget == endTarget)
+                            {
+                                // Both leave instructions target the same destination.
+                                // Skip the explicit one to avoid dead code that confuses
+                                // the v10 Mono interpreter.
+                                skipInstrEmit = true;
+                            }
+                        }
+                    }
+
+                    // Avoid duplicate endfinally / endfault at end of handler.
+                    // ILGenerator.EndExceptionBlock() calls InternalEndClause() which
+                    // emits an implicit endfinally, so skip the explicit one from source IL.
+                    // We use skipInstrEmit instead of goto SkipEmit here because SkipEmit
+                    // defers EndExceptionBlock to the next iteration (via checkTryEndEarly),
+                    // which would place it AFTER the next instruction's MarkLabel, corrupting
+                    // branch targets. Instead, we skip only the emit and let EndExceptionBlock
+                    // fire at its normal position (lines below), before the next MarkLabel.
+                    if (handler.HandlerEnd == instr.Next)
+                    {
+                        switch (handler.HandlerType)
+                        {
+                            case ExceptionHandlerType.Finally:
+                            case ExceptionHandlerType.Fault:
+                                if (instr.OpCode == Mono.Cecil.Cil.OpCodes.Endfinally)
+                                {
+                                    skipInstrEmit = true;
+                                }
+                                break;
+                        }
+                    }
                 }
 
+                if (!skipInstrEmit)
+                {
                 if (instr.OpCode.OperandType == Mono.Cecil.Cil.OperandType.InlineNone)
                     il.Emit(_ReflOpCodes[instr.OpCode.Value]);
                 else
@@ -278,6 +364,7 @@ namespace MonoMod.Utils
 
                     il.DynEmit(_ReflOpCodes[opcode.Value], operand);
                 }
+                } // !skipInstrEmit
 
                 if (!checkTryEndEarly)
                 {
@@ -291,10 +378,12 @@ namespace MonoMod.Utils
                 }
 
                 checkTryEndEarly = false;
+                skipInstrEmit = false;
                 continue;
 
                 SkipEmit:
                 checkTryEndEarly = true;
+                skipInstrEmit = false;
                 continue;
             }
         }
