@@ -48,6 +48,114 @@ namespace MonoMod.Utils
             return value!;
         }
 
+        private static bool IsIgnorableResolveException(Exception e)
+            => e is FileNotFoundException ||
+               e is FileLoadException ||
+               e is TypeLoadException ||
+               e is ReflectionTypeLoadException ||
+               e is MissingMethodException ||
+               e is BadImageFormatException;
+
+        private static bool SafeIs(MemberReference mref, MemberInfo minfo)
+        {
+            try
+            {
+                return mref.Is(minfo);
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return false;
+            }
+        }
+
+        private static IEnumerable<Type> SafeGetTypes(Module module)
+        {
+            try
+            {
+                return module.GetTypes();
+            }
+            catch (ReflectionTypeLoadException e)
+            {
+                return e.Types.Where(t => t != null)!;
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return Array.Empty<Type>();
+            }
+        }
+
+        private static MethodInfo[] SafeGetMethods(Type type)
+        {
+            try
+            {
+                return type.GetMethods(_BindingFlagsAll);
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return Array.Empty<MethodInfo>();
+            }
+        }
+
+        private static ConstructorInfo[] SafeGetConstructors(Type type)
+        {
+            try
+            {
+                return type.GetConstructors(_BindingFlagsAll);
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return Array.Empty<ConstructorInfo>();
+            }
+        }
+
+        private static FieldInfo[] SafeGetFields(Type type)
+        {
+            try
+            {
+                return type.GetFields(_BindingFlagsAll);
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return Array.Empty<FieldInfo>();
+            }
+        }
+
+        private static MemberInfo[] SafeGetMembers(Type type)
+        {
+            try
+            {
+                return type.GetMembers(_BindingFlagsAll);
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return Array.Empty<MemberInfo>();
+            }
+        }
+
+        private static MethodInfo[] SafeGetMethods(Module module)
+        {
+            try
+            {
+                return module.GetMethods(_BindingFlagsAll);
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return Array.Empty<MethodInfo>();
+            }
+        }
+
+        private static FieldInfo[] SafeGetFields(Module module)
+        {
+            try
+            {
+                return module.GetFields(_BindingFlagsAll);
+            }
+            catch (Exception e) when (IsIgnorableResolveException(e))
+            {
+                return Array.Empty<FieldInfo>();
+            }
+        }
+
         public static Assembly Load(ModuleDefinition module)
         {
             Helpers.ThrowIfArgumentNull(module);
@@ -370,11 +478,20 @@ namespace MonoMod.Utils
                 else
                 {
                     type = modules
-                        .Select(module => module.GetType(mref.FullName.Replace("/", "+", StringComparison.Ordinal), false, false))
+                        .Select(module => {
+                            try
+                            {
+                                return module.GetType(mref.FullName.Replace("/", "+", StringComparison.Ordinal), false, false);
+                            }
+                            catch (Exception e) when (IsIgnorableResolveException(e))
+                            {
+                                return null;
+                            }
+                        })
                         .FirstOrDefault(m => m != null);
                     if (type == null)
                         type = modules
-                            .Select(module => module.GetTypes().FirstOrDefault(m => mref.Is(m)))
+                            .Select(module => SafeGetTypes(module).FirstOrDefault(m => SafeIs(mref, m)))
                             .FirstOrDefault(m => m != null);
                     if (type == null && !refetchingModules)
                         goto RefetchModules;
@@ -396,11 +513,11 @@ namespace MonoMod.Utils
             {
                 if (mref is MethodReference)
                     member = modules
-                        .Select(module => module.GetMethods(_BindingFlagsAll).FirstOrDefault(m => mref.Is(m)))
+                        .Select(module => SafeGetMethods(module).FirstOrDefault(m => SafeIs(mref, m)))
                         .FirstOrDefault(m => m != null);
                 else if (mref is FieldReference)
                     member = modules
-                        .Select(module => module.GetFields(_BindingFlagsAll).FirstOrDefault(m => mref.Is(m)))
+                        .Select(module => SafeGetFields(module).FirstOrDefault(m => SafeIs(mref, m)))
                         .FirstOrDefault(m => m != null);
                 else
                     throw new NotSupportedException($"Unsupported <Module> member type {mref.GetType().FullName}");
@@ -411,18 +528,15 @@ namespace MonoMod.Utils
                 var declType = (Type?)_ResolveReflection(mref.DeclaringType, modules);
 
                 if (mref is MethodReference)
-                    member = declType!
-                        .GetMethods(_BindingFlagsAll).Cast<MethodBase>()
-                        .Concat(declType.GetConstructors(_BindingFlagsAll))
-                        .FirstOrDefault(m => mref.Is(m));
+                    member = SafeGetMethods(declType!).Cast<MethodBase>()
+                        .Concat(SafeGetConstructors(declType!))
+                        .FirstOrDefault(m => SafeIs(mref, m));
                 else if (mref is FieldReference)
-                    member = declType!
-                        .GetFields(_BindingFlagsAll)
-                        .FirstOrDefault(m => mref.Is(m));
+                    member = SafeGetFields(declType!)
+                        .FirstOrDefault(m => SafeIs(mref, m));
                 else
-                    member = declType!
-                        .GetMembers(_BindingFlagsAll)
-                        .FirstOrDefault(m => mref.Is(m));
+                    member = SafeGetMembers(declType!)
+                        .FirstOrDefault(m => SafeIs(mref, m));
             }
 
             if (member == null && !refetchingModules)
