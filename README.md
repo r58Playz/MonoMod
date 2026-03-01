@@ -15,10 +15,14 @@ General purpose .NET assembly modding "basework", powered by [cecil](https://git
 <sup>[... or download fresh build artifacts for the last commit.](https://github.com/MonoMod/MonoMod/actions/workflows/ci.yml?query=branch%3Areorganize)</sup>
 
 ## Sections
+- [WASM](#wasm)
 - [Introduction](#introduction)
 - [Using RuntimeDetour](docs/RuntimeDetour/Usage.md)
 
 ----
+
+## WASM
+A `liba.c` NativeFileReference needs to be added, this will soon be built in CI and copied into this repo
 
 ## Introduction
 MonoMod is a modding "basework" (base tools + framework).  

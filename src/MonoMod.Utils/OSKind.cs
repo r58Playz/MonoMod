@@ -47,6 +47,14 @@
         /// A BSD kernel.
         /// </summary>
         BSD = 1 << 4 | Posix,
+        /// <summary>
+        /// An Android operating system.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="OSKindExtensions.GetKernel(OSKind)"/> will return <see cref="Linux"/>, and
+        /// <see cref="OSKindExtensions.GetSubtypeId(OSKind)"/> will return <c>2</c>.
+        /// </remarks>
+        Emscripten = 0x01 << 6 | Linux,
 
         /// <summary>
         /// A Windows kernel.

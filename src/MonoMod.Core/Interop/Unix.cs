@@ -6,49 +6,40 @@ namespace MonoMod.Core.Interop
     internal static class Unix
     {
         // If this dllimport decl isn't enough to get the runtime to load the right thing, I give up
-        public const string LibC = "libc";
+        public const string LibC = "liba";
 
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "read")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_read")]
         public static extern unsafe nint Read(int fd, IntPtr buf, nint count);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "write")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_write")]
         public static extern unsafe nint Write(int fd, IntPtr buf, nint count);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "pipe2")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_pipe2")]
         public static extern unsafe int Pipe2(int* pipefd, PipeFlags flags);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "close")]
-        public static extern unsafe int Close(int fd);
-
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mmap")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_mmap")]
         public static extern unsafe nint Mmap(IntPtr addr, nuint length, Protection prot, MmapFlags flags, int fd, int offset);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "munmap")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_munmap")]
         public static extern unsafe int Munmap(IntPtr addr, nuint length);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mprotect")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_mprotect")]
         public static extern unsafe int Mprotect(IntPtr addr, nuint len, Protection prot);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "sysconf")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_sysconf")]
         public static extern unsafe long Sysconf(SysconfName name);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mincore")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_mincore")]
         public static extern unsafe int Mincore(IntPtr addr, nuint len, byte* vec);
 
-        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "mkstemp")]
+        [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "_mkstemp")]
         public static extern unsafe int MkSTemp(byte* template);
 
         [DllImport(LibC, CallingConvention = CallingConvention.Cdecl, EntryPoint = "__errno_location")]
         public static extern unsafe int* __errno_location();
 
         public static unsafe int Errno => *__errno_location();
-
-        static Unix()
-        {
-            // Preload pinvoke initialization so it doesn't affect errno when accessed the first time
-            _ = Errno;
-        }
 
         [Flags]
         public enum PipeFlags : int

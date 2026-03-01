@@ -211,7 +211,7 @@ namespace MonoMod.Utils
             => Generate(null);
         public MethodInfo Generate(object? context)
         {
-            var dmdType = Switches.TryGetSwitchValue(Switches.DMDType, out var swValue) ? swValue as string : null;
+            var dmdType = "dm";
 
             if (dmdType is not null)
             {

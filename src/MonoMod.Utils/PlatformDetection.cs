@@ -123,6 +123,11 @@ namespace MonoMod.Utils
                 {
                     os = OSKind.Posix;
                 }
+                // TODO fix this to detect only Emscripten
+                else if (platID.Contains("OTHER", StringComparison.Ordinal))
+                {
+                    os = OSKind.Posix;
+                }
             }
 
             // Try to use OS-specific methods of determining OS/Arch info
@@ -239,6 +244,10 @@ namespace MonoMod.Utils
                     // Note: I'm fairly sure that the different BSDs vary quite a lot, so it may be worth checking with more specificity here
                     os = OSKind.BSD;
                 }
+                else if (kernelName.Contains("EMSCRIPTEN", StringComparison.Ordinal))
+                {
+                    os = OSKind.Emscripten;
+                }
                 // TODO: fill in other known kernel names
 
                 var machineName = GetMachineNamePosix(os, buffer).ToUpperInvariant();
@@ -258,6 +267,10 @@ namespace MonoMod.Utils
                 else if (machineName.Contains("ARM", StringComparison.Ordinal))
                 {
                     arch = ArchitectureKind.Arm;
+                }
+                else if (machineName.Contains("WASM32", StringComparison.Ordinal))
+                {
+                    arch = ArchitectureKind.Wasm32;
                 }
                 // TODO: fill in other values for machine
 

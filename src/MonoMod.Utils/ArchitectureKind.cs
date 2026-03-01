@@ -41,5 +41,9 @@ namespace MonoMod.Utils
         /// The 64-bit ARM instruction set.
         /// </summary>
         Arm64 = Arm | Bits64,
+        /// <summary>
+        /// The WASM instruction set.
+        /// </summary>
+        Wasm32 = 0x03 << 1,
     }
 }

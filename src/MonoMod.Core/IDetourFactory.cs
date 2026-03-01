@@ -1,9 +1,9 @@
-﻿using MonoMod.Core.Platforms;
+﻿using MonoMod.Backports;
+using MonoMod.Core.Platforms;
 using MonoMod.Utils;
 using System;
-using System.ComponentModel;
-using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace MonoMod.Core
 {
@@ -25,10 +25,6 @@ namespace MonoMod.Core
         /// <param name="request">The <see cref="CreateNativeDetourRequest"/> containing detour creation options.</param>
         /// <returns>The created <see cref="ICoreNativeDetour"/>.</returns>
         ICoreNativeDetour CreateNativeDetour(CreateNativeDetourRequest request);
-        /// <summary>
-        /// Gets whether this <see cref="IDetourFactory"/> can create <see cref="ICoreNativeDetour"/>s with an <see cref="ICoreNativeDetour.OrigEntrypoint"/>.
-        /// </summary>
-        bool SupportsNativeDetourOrigEntrypoint { get; }
     }
 
     /// <summary>
@@ -83,45 +79,31 @@ namespace MonoMod.Core
     }
 
     /// <summary>
-    /// Provides access to the global, current <see cref="IDetourFactory"/>, as well as extension methods to make
+    /// Provides access to a default, LibA-based <see cref="IDetourFactory"/>, as well as extension methods to make
     /// using <see cref="IDetourFactory"/> easier.
     /// </summary>
     [CLSCompliant(true)]
     public static class DetourFactory
     {
-        private static object currentLock = new();
-
-        private static IDetourFactory? lazyDefault;
-
-        /// <summary>
-        /// Gets the default <see cref="IDetourFactory"/>. This is always the <see cref="PlatformTriple"/>-based <see cref="IDetourFactory"/>.
-        /// </summary>
-        public static unsafe IDetourFactory Default => Helpers.GetOrInitWithLock(ref lazyDefault, currentLock, &CreateDefault);
-        [SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance",
-            Justification = "Must have this exact return type.")]
-        private static IDetourFactory CreateDefault() => new PlatformTripleDetourFactory(PlatformTriple.Current);
-
+        // use the actual type for this so that an inlined getter can see the actual type
         private static IDetourFactory? lazyCurrent;
         /// <summary>
-        /// Gets the current <see cref="IDetourFactory"/>.
+        /// Gets the current (default) <see cref="IDetourFactory"/>. This is always the <see cref="PlatformTriple"/>-based <see cref="IDetourFactory"/>.
         /// </summary>
-        public static unsafe IDetourFactory Current => Helpers.GetOrInitWithLock(ref lazyCurrent, currentLock, &CreateCurrent);
-        private static IDetourFactory CreateCurrent() => Default;
-
-        /// <summary>
-        /// Sets the current <see cref="IDetourFactory"/>.
-        /// </summary>
-        /// <param name="creator">The delegate that is invoked to produce the new <see cref="IDetourFactory"/>, with current <see cref="IDetourFactory"/> as the argument.</param>
-        [EditorBrowsable(EditorBrowsableState.Never)]
-        public static void SetCurrentFactory(Func<IDetourFactory, IDetourFactory> creator)
+        /// <remarks>
+        /// The default <see cref="IDetourFactory"/> is created the first time this property is accessed, using the value of <see cref="PlatformTriple.Current"/>
+        /// at that point in time. After it is constructed, the <see cref="PlatformTriple"/> implementation cannot be replaced.
+        /// </remarks>
+        /// <seealso cref="PlatformTriple.Current"/>
+        public static unsafe IDetourFactory Current
         {
-            Helpers.ThrowIfArgumentNull(creator);
-
-            lock (currentLock)
-            {
-                lazyCurrent = creator(Current);
-            }
+            [MethodImpl(MethodImplOptionsEx.AggressiveInlining)]
+            get => Helpers.GetOrInit(ref lazyCurrent, createDefaultFactoryFunc);
         }
+
+        private static readonly Func<IDetourFactory> createDefaultFactoryFunc = CreateDefaultFactory;
+        private static WasmDetourFactory CreateDefaultFactory()
+            => new(PlatformTriple.Current);
 
         /// <summary>
         /// Creates a managed detour from <paramref name="source"/> to <paramref name="target"/>.
