@@ -13,6 +13,7 @@ namespace MonoMod.Core.Platforms
     public sealed class WasmDetourFactory : IDetourFactory
     {
         public static bool EnableTailCallDetours = false;
+        public static HashSet<string> Blacklist = new();
 
         private static class LibA
         {
@@ -284,6 +285,22 @@ namespace MonoMod.Core.Platforms
             }
         }
 
+        private sealed class NullifiedDetour : ICoreDetourBase, ICoreDetour
+        {
+            public MethodBase Source { get; }
+            public MethodBase Target { get; }
+            public bool IsApplied => false;
+
+            public NullifiedDetour(MethodBase src, MethodBase dst)
+            {
+                Source = src;
+                Target = dst;
+            }
+
+            public void Apply() {}
+            public void Undo() {}
+            public void Dispose() {}
+        }
 
         private readonly PlatformTriple triple;
 
@@ -302,6 +319,15 @@ namespace MonoMod.Core.Platforms
         {
             Helpers.ThrowIfArgumentNull(request.Source);
             Helpers.ThrowIfArgumentNull(request.Target);
+
+            string sourceAsm = request.Source.DeclaringType?.Assembly.GetName().Name ?? "Unknown";
+            string targetAsm = request.Target.DeclaringType?.Assembly.GetName().Name ?? "Unknown";
+
+            if (Blacklist.Contains(sourceAsm) || Blacklist.Contains(targetAsm))
+            {
+                MMDbgLog.Warning($"[WasmDetour] Skipping hook from \"{request.Source}\" to \"{request.Target}\" because containing assembly is blacklisted");
+                return new NullifiedDetour(request.Source, request.Target);
+            }
 
             if (!triple.TryDisableInlining(request.Source))
                 MMDbgLog.Warning($"Could not disable inlining of method {request.Source}; detours may not be reliable");
