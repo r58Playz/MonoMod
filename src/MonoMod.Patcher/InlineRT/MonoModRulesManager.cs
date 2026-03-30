@@ -13,6 +13,8 @@ namespace MonoMod.InlineRT
     {
 
         private static readonly Assembly MonoModAsm = typeof(MonoModRulesManager).Assembly;
+        [ThreadStatic]
+        private static MonoModder ThreadLocalCurrentModder;
 
         private static long PrevID;
         private static readonly Dictionary<long, WeakReference> ModderMap = new Dictionary<long, WeakReference>();
@@ -22,20 +24,43 @@ namespace MonoMod.InlineRT
         {
             get
             {
-                var st = new StackTrace();
-                for (var i = 1; i < st.FrameCount; i++)
+                try
                 {
-                    StackFrame frame = st.GetFrame(i);
-                    MethodBase method = frame.GetMethod();
-                    Assembly asm = method.DeclaringType.Assembly;
-                    if (asm == MonoModAsm)
-                        continue;
-                    MonoModder modder = GetModder(method.DeclaringType.Assembly.GetName().Name);
-                    if (modder != null)
-                        return modder;
+                    var st = new StackTrace();
+                    for (var i = 1; i < st.FrameCount; i++)
+                    {
+                        StackFrame frame = st.GetFrame(i);
+                        MethodBase method = frame.GetMethod();
+                        Assembly asm = method.DeclaringType.Assembly;
+                        if (asm == MonoModAsm)
+                            continue;
+                        MonoModder modder = GetModder(method.DeclaringType.Assembly.GetName().Name);
+                        if (modder != null)
+                            return modder;
+                    }
                 }
+
+                catch
+                {
+                }
+
+                if (ThreadLocalCurrentModder != null)
+                    return ThreadLocalCurrentModder;
+
                 return null;
             }
+        }
+
+        internal static MonoModder EnterModderContext(MonoModder modder)
+        {
+            var previousModder = ThreadLocalCurrentModder;
+            ThreadLocalCurrentModder = modder;
+            return previousModder;
+        }
+
+        internal static void ExitModderContext(MonoModder previousModder)
+        {
+            ThreadLocalCurrentModder = previousModder;
         }
 
         public static Type RuleType
@@ -163,7 +188,15 @@ namespace MonoMod.InlineRT
             self.MissingDependencyThrow = missingDependencyThrow;
 
             Type rules = asm.GetType(orig.FullName);
-            RuntimeHelpers.RunClassConstructor(rules.TypeHandle);
+            var previousModder = EnterModderContext(self);
+            try
+            {
+                RuntimeHelpers.RunClassConstructor(rules.TypeHandle);
+            }
+            finally
+            {
+                ExitModderContext(previousModder);
+            }
 
             return rules;
         }

@@ -859,12 +859,21 @@ namespace MonoMod
             if (!cap.HasCustomAttributes)
                 return;
 
-            foreach (CustomAttribute attrib in cap.CustomAttributes.ToArray())
+            var previousModder = MonoModRulesManager.EnterModderContext(this);
+            try
             {
-                if (CustomAttributeHandlers.TryGetValue(attrib.AttributeType.FullName, out Action<object, object[]> handler))
-                    handler?.Invoke(null, new object[] { cap, attrib });
-                if (cap is MethodReference && CustomMethodAttributeHandlers.TryGetValue(attrib.AttributeType.FullName, out handler))
-                    handler?.Invoke(null, new object[] { (MethodDefinition)cap, attrib });
+
+                foreach (CustomAttribute attrib in cap.CustomAttributes.ToArray())
+                {
+                    if (CustomAttributeHandlers.TryGetValue(attrib.AttributeType.FullName, out Action<object, object[]> handler))
+                        handler?.Invoke(null, new object[] { cap, attrib });
+                    if (cap is MethodReference && CustomMethodAttributeHandlers.TryGetValue(attrib.AttributeType.FullName, out handler))
+                        handler?.Invoke(null, new object[] { (MethodDefinition)cap, attrib });
+                }
+            }
+            finally
+            {
+                MonoModRulesManager.ExitModderContext(previousModder);
             }
         }
 
@@ -904,11 +913,19 @@ namespace MonoMod
 
             if (PostProcessors != null)
             {
-                Delegate[] pps = PostProcessors.GetInvocationList();
-                for (var i = 0; i < pps.Length; i++)
+                var previousModder = MonoModRulesManager.EnterModderContext(this);
+                try
                 {
-                    Log($"[PostProcessor] PostProcessor pass #{i + 1}");
-                    ((PostProcessor)pps[i])?.Invoke(this);
+                    Delegate[] pps = PostProcessors.GetInvocationList();
+                    for (var i = 0; i < pps.Length; i++)
+                    {
+                        Log($"[PostProcessor] PostProcessor pass #{i + 1}");
+                        ((PostProcessor)pps[i])?.Invoke(this);
+                    }
+                }
+                finally
+                {
+                    MonoModRulesManager.ExitModderContext(previousModder);
                 }
             }
         }
